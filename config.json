@@ -1,0 +1,40 @@
+{
+	"voice":
+	{
+		"speed": 2
+	},
+	"reddit":
+	{
+		"clientID": "6YI-aV_6xoVxeA",
+		"clientSecret": "DRVgdE4-yrY9edp4_QK7_nmatOk",
+		"username": "BlackwonderTF",
+		"password": "ing39f76085612",
+		"userAgent": "BlackwonderTF",
+		"subreddit": "askreddit",
+		"maxCharacterComment": 3000,
+		"activateCommand": "!r2YTbot",
+		"topFilter": "day"
+	},
+	"youtube":
+	{
+		"titlePrefix": "",
+		"titleSuffix": "",
+		"description": "",
+		"keywords": ""
+	},
+	"general":
+	{
+		"workingDir": "C:/Users/Benedikt/Documents/GitHub/RedditToYoutubeAutomation",
+		"scoreFilter": 10000
+	},
+	"video":
+	{
+		"width": 1920,
+		"height": 1080,
+		"framerate": 30
+	},
+	"style":
+	{
+		"commentsBackground": "res/backgrounds/comments.png"
+	}
+}

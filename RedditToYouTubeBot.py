@@ -5,6 +5,8 @@ import unicodedata
 
 import time
 
+import math
+
 from PIL import Image, ImageDraw, ImageFont
 import textwrap
 
@@ -24,17 +26,21 @@ import ffmpeg
 import moviepy.editor as mp
 import glob
 
+# Config
+import json
+with open('config.json') as config_file:
+    config = json.load(config_file)
+
+# Voice
 import tts.sapi
 voice = tts.sapi.Sapi()
-voice.set_rate(2)
+voice.set_rate(config['voice']['speed'])
 voice.set_voice('Vocalizer Expressive Daniel Harpo 22kHz')
 
-print("Current Working Directory " , os.getcwd())
+def makeVideo(audioTimes, imageDir, qNum, title):
 
-def makeVid (audioTimes, imageDir, qNum, title):
-
-    #multiplies everything by 10
-    audioTimes = [x * 10 for x in audioTimes]
+    # Multiplies everything by framerate
+    audioTimes = [math.ceil(x * config['video']['framerate']) for x in audioTimes]
 
     video_name = 'res/video' + str(qNum)
     fileType = '.avi'
@@ -43,97 +49,77 @@ def makeVid (audioTimes, imageDir, qNum, title):
     images = []
 
     for img in os.listdir(imageDir):
-        if (img.endswith(".png")):
+        if (img.endswith('.png')):
             imagesTemp.append(img)
 
-    imagesTemp = natsorted(imagesTemp, key=lambda y: y.lower())
+    # Sort images in natural order
+    imagesTemp = natsorted(imagesTemp, key = lambda y: y.lower())
 
-    i=0
+    i = 0
     for img in imagesTemp:
         if (img.startswith(str(qNum))):
             images.append(img)
 
-        i+=1
-
-
-    #sort images in natural order
-
+        i += 1
 
     print(images)
 
     frame = cv2.imread(os.path.join(imageDir, images[0]))
     height, width, layers = frame.shape
 
+    video = cv2.VideoWriter(video_name + fileType, 0, config['video']['framerate'], (config['video']['width'], config['video']['height']))
 
-    framerate = 10
-    # 1 second for each photo. This means photos must be repeated based on how many seconds their audio takes.
-
-    video = cv2.VideoWriter(video_name + fileType, 0, framerate , (1920, 1080))
-
-    # for i in range(0, len[images]):
-    #     image = images[i]
-    #     video.write(cv2.imread(os.path.join(image_folder, image)))
-    #     #video.write(cv2.imread(os.path.join(image_folder, image)))
-
-
-
-    i=0
+    i = 0
     for image in images:
+        print(audioTimes[i])
         for j in range (0, int(audioTimes[i])):
             video.write(cv2.imread(os.path.join(imageDir, image)))
-        i+=1
+        i += 1
 
     cv2.destroyAllWindows()
     video.release()
     mergeAudio(video_name, qNum, title)
 
-
+def truncate(n, decimals = 0):
+    multiplier = 10 ** decimals
+    return int(n * multiplier) / multiplier
 
 def mergeAudio(videoFile, qNum, title):
 
     voicesDir = 'res/voice'
-    voices = [img for img in os.listdir(voicesDir) if (img.endswith(".mp3") and img.startswith(str(qNum)))]
+    voices = [img for img in os.listdir(voicesDir) if (img.endswith('.mp3') and img.startswith(str(qNum)))]
 
     #sort voices in natural order
     voices = natsorted(voices, key=lambda y: y.lower())
 
-
-
-    # Concatenation is just adding
-    # audioFile = AudioSegment.from_mp3("res/voice/" + voices[0])
-    # for l in range (1, len(voices)):
-    #     voice = voices[l]
-    #     fullAudio+= AudioSegment.from_mp3(voice)
-
     audioFile = AudioSegment.empty()
+    i = 0
     for voice in voices:
-        audioFile += AudioSegment.from_mp3('res/voice/' + voice)
+        singleFile = AudioSegment.from_mp3('res/voice/' + voice)
+        audioFile += singleFile
+        i += 1
 
     # writing mp3 files is a one liner
-    audioFile.export('res/voice' + str(qNum) + '.mp3', format="mp3")
+    audioFile.export('res/voice' + str(qNum) + '.mp3', format='mp3')
 
     video = mp.VideoFileClip('res/video' + str(qNum) + '.avi')
 
-    video.write_videofile("res/final/final "+ str(qNum) +".mp4", audio='res/voice' + str(qNum) + '.mp3')
+    video.write_videofile('res/final/final '+ str(qNum) +'.mp4', audio='res/voice' + str(qNum) + '.mp3')
 
-    # cmd = 'ffmpeg -y -i '+audioFile+'  -r 30 -i '+videoFile+'  -filter:a aresample=async=1 -c:a flac -c:v copy av.mkv'
-    # subprocess.call(cmd, shell=True)                                     # "Muxing Done
-    # print('Mixing Done')
+    clearDirectories()
 
-    clearDirs()
-
-    uploadToYouTube(qNum, title)
+    # uploadToYouTube(qNum, title)
 
 def uploadToYouTube(qNum, title):
     fileName = 'res/final/final ' + str(qNum)
     title = title.replace("\"", "")
     title = title.replace("\'", "")
     print(title)
-    cmd = "python upload_video.py --file='"+fileName+".mp4' --title='Top Ask Reddit of Yesterday' --description='Ask Reddit: "+title+"' --keywords='meme'"
+    cmd = "python upload_video.py --file='" + fileName + ".mp4' --title='Top Ask Reddit of Yesterday' --description='Ask Reddit: " + title + "' --keywords='meme'"
     print(cmd)
     os.system(cmd)
 
-def clearDirs ():
+def clearDirectories():
     files = glob.glob('res/images/*')
     for f in files:
         os.remove(f)
@@ -141,58 +127,57 @@ def clearDirs ():
     for f in files:
         os.remove(f)
 
-def createImages (text, author, imagePrefix):
+def createImages (text, score, author, imagePrefix):
 
     audioTimes = []
 
     text = text.replace("*","")
 
-    screenSize=(1920, 1080)
-    #print(novo)
+    screenSize = (config['video']['width'], config['video']['height'])
     fontSize=40
 
 
     font = ImageFont.truetype("Verdana.ttf", fontSize)
-    authorFont = ImageFont.truetype("Verdana.ttf", int(fontSize/1.5))
+    authorFont = ImageFont.truetype("Verdana.ttf", int(fontSize / 1.5))
+    scoreFont = ImageFont.truetype("Verdana.ttf", int(fontSize / 1.5))
+
+    textArray = textwrap.wrap(text, width = 3000 / fontSize)
+
+    numberOfLines = screenSize[1] / (fontSize * 1.5) - 2
 
 
-    #text = 'Hello World! This is a bunch of text. Can we get an F in the chat? Wow, much words. The Glasgow Ice Cream Wars - 6 people died in a turf war over ice cream van routes (they were dealing heroin out of the vans). In 2007 a paraglider got trapped in the updraft of two joining thunderstorms and lifted to an altitude of 10 kilometers. She landed 3,5 hours later about 60 kilometers north of her starting position having survived extreme cold, lightning and lack of oxygen. Wow, much words. The Glasgow Ice Cream Wars - 6 people died in a turf war over ice cream van routes (they were dealing heroin out of the vans). In 2007 a paraglider got trapped in the updraft of two joining thunderstorms and lifted to an altitude of 10 kilometers. She landed 3,5 hours later about 60 kilometers north of her starting position having survived extreme cold, lightning and lack of oxygen. Hello World! This is a bunch of text. Can we get an F in the chat? Wow, much words. The Glasgow Ice Cream Wars - 6 people died in a turf war over ice cream van routes (they were dealing heroin out of the vans). In 2007 a paraglider got trapped in the updraft of two joining thunderstorms and lifted to an altitude of 10 kilometers. She landed 3,5 hours later about 60 kilometers north of her starting position having survived extreme cold, lightning and lack of oxygen. Wow, much words. The Glasgow Ice Cream Wars - 6 people died in a turf war over ice cream van routes (they were dealing heroin out of the vans). In 2007 a paraglider got trapped in the updraft of two joining thunderstorms and lifted to an altitude of 10 kilometers. She landed 3,5 hours later about 60 kilometers north of her starting position having survived extreme cold, lightning and lack of oxygen. Hello World! This is a bunch of text. Can we get an F in the chat? Wow, much words. The Glasgow Ice Cream Wars - 6 people died in a turf war over ice cream van routes (they were dealing heroin out of the vans). In 2007 a paraglider got trapped in the updraft of two joining thunderstorms and lifted to an altitude of 10 kilometers. She landed 3,5 hours later about 60 kilometers north of her starting position having survived extreme cold, lightning and lack of oxygen. Wow, much words. The Glasgow Ice Cream Wars - 6 people died in a turf war over ice cream van routes (they were dealing heroin out of the vans). In 2007 a paraglider got trapped in the updraft of two joining thunderstorms and lifted to an altitude of 10 kilometers. She landed 3,5 hours later about 60 kilometers north of her starting position having survived extreme cold, lightning and lack of oxygen. Hello World! This is a bunch of text. Can we get an F in the chat? Wow, much words. The Glasgow Ice Cream Wars - 6 people died in a turf war over ice cream van routes (they were dealing heroin out of the vans). In 2007 a paraglider got trapped in the updraft of two joining thunderstorms and lifted to an altitude of 10 kilometers. She landed 3,5 hours later about 60 kilometers north of her starting position having survived extreme cold, lightning and lack of oxygen. Wow, much words. The Glasgow Ice Cream Wars - 6 people died in a turf war over ice cream van routes (they were dealing heroin out of the vans). In 2007 a paraglider got trapped in the updraft of two joining thunderstorms and lifted to an altitude of 10 kilometers. She landed 3,5 hours later about 60 kilometers north of her starting position having survived extreme cold, lightning and lack of oxygen. Hello World! This is a bunch of text. Can we get an F in the chat? Wow, much words. The Glasgow Ice Cream Wars - 6 people died in a turf war over ice cream van routes (they were dealing heroin out of the vans). In 2007 a paraglider got trapped in the updraft of two joining thunderstorms and lifted to an altitude of 10 kilometers. She landed 3,5 hours later about 60 kilometers north of her starting position having survived extreme cold, lightning and lack of oxygen. Wow, much words. The Glasgow Ice Cream Wars - 6 people died in a turf war over ice cream van routes (they were dealing heroin out of the vans). In 2007 a paraglider got trapped in the updraft of two joining thunderstorms and lifted to an altitude of 10 kilometers. She landed 3,5 hours later about 60 kilometers north of her starting position having survived extreme cold, lightning and lack of oxygen.'
-    textArray = textwrap.wrap(text, width=2200/fontSize)
-
-    numberOfLines = screenSize[1]/(fontSize*1.5) - 2
+    numberOfFiles = int(len(textArray) / numberOfLines) + 1
 
 
-    numberOfFiles = int(len(textArray)/numberOfLines) + 1
-
-    #img_draw.rectangle((70, 50, 270, 200), outline='red', fill='blue')
-
-
-    j=0
+    j = 0
     currentLine = 0
 
     for j in range (0, numberOfFiles):
         textOnPage=''
-        blank_image = Image.new('RGBA', screenSize, 'white')
-        img_draw = ImageDraw.Draw(blank_image)
+        backgroundImage = Image.open(config['style']['commentsBackground'])
+        backgroundImageDraw = ImageDraw.Draw(backgroundImage)
 
 
         for k in range (0, int(numberOfLines)):
-            if (currentLine==len(textArray)):
+            if (currentLine == len(textArray)):
                 break
 
             s = textArray[currentLine]
-            textOnPage+=' '
-            textOnPage+=s
-            authorPos=(400, 666)
+            textOnPage += ' '
+            textOnPage += s
+            authorPos = (300, 175)
+            scorePos = (70, 490)
 
-            textPos = (20, fontSize*1.5* ( (currentLine%numberOfLines) + 1 ))
-            img_draw.text(textPos, s, fill='black', font=font, anchor='None')
+            textPos = (300, fontSize * 1.5 * ((currentLine % numberOfLines) + 5))
+            backgroundImageDraw.text(textPos, s, fill = 'white', font = font, anchor='None')
 
-            img_draw.text(authorPos, author, fill='black', font=authorFont, anchor='None')
+            backgroundImageDraw.text(authorPos, author, fill = 'white', font = authorFont, anchor = 'None')
 
-            currentLine+=1
+            backgroundImageDraw.text(scorePos, str(score), fill = 'white', font = scoreFont, anchor = 'None')
 
-        blank_image.save('res/images/' + imagePrefix + '-' + str(j) + ".png")
+            currentLine += 1
+
+        backgroundImage.save('res/images/' + imagePrefix + '-' + str(j) + ".png")
 
         audioTimes.append(createVoice(textOnPage, 'res/voice/' + imagePrefix + '-' + str(j) + ".wav"))
 
@@ -203,7 +188,7 @@ def createImages (text, author, imagePrefix):
     staticName = 'res/voice/' + fileName + '-static.mp3'
     shutil.copy('res/static.mp3', staticName)
     staticAudio = MP3('res/static.mp3')
-    audioTimes.append(round(staticAudio.info.length, 1))
+    audioTimes.append(truncate(staticAudio.info.length, 1))
     return audioTimes
 
 
@@ -212,7 +197,7 @@ def createTitleImage (text, imagePrefix):
 
     audioTimes = []
 
-    screenSize=(1920, 1080)
+    screenSize = (config['video']['width'], config['video']['height'])
     #print(novo)
     fontSize=60
 
@@ -244,7 +229,7 @@ def createTitleImage (text, imagePrefix):
     staticName = 'res/voice/' + imagePrefix + '-0-0-static.mp3'
     shutil.copy('res/static.mp3', staticName)
     staticAudio = MP3('res/static.mp3')
-    audioTimes.append(round(staticAudio.info.length, 1))
+    audioTimes.append(truncate(staticAudio.info.length, 1))
     return audioTimes
 
 
@@ -255,12 +240,11 @@ def createVoice (text, fileName):
     audioTime = 0
     try:
         voice.create_recording(fileName, text)
-        os.chdir('C:/Users/Benedikt/Downloads/RedditToYouTubeBot-master')
+        os.chdir(config['general']['workingDir'])
         AudioSegment.from_wav(fileName).export(fileName.replace('.wav', '.mp3'), format="mp3")
 
         audio = MP3(fileName.replace('.wav', '.mp3'))
-        audioTime=audio.info.length
-        audioTime = round(audioTime, 1)
+        audioTime = truncate(audio.info.length, 1)
 
 
     except Exception as e:
@@ -269,67 +253,46 @@ def createVoice (text, fileName):
     return audioTime
 
 
-
-
-
-
-
-
-
-
-
-
-##################################################################################################### reddit stuff
-
-
-
-
+# ------------ Main Code ------------
 
 
 
 # create the objects from the imported modules
 
-# reddit api login
-reddit = praw.Reddit(client_id='6YI-aV_6xoVxeA',
-                     client_secret='DRVgdE4-yrY9edp4_QK7_nmatOk',
-                     username='BlackwonderTF',
-                     password='ing39f76085612',
-                     user_agent='BlackwonderTF')
+# Reddit Login
+reddit = praw.Reddit(client_id = config['reddit']['clientID'],
+                     client_secret = config['reddit']['clientSecret'],
+                     username = config['reddit']['username'],
+                     password = config['reddit']['password'],
+                     user_agent = config['reddit']['userAgent'])
 
-
-
-# the subreddits you want your bot to live on
-subreddit = reddit.subreddit('askreddit')
+subreddit = reddit.subreddit(config['reddit']['subreddit'])
 stream = subreddit.stream
 
 # phrase to activate the bot
-keyphrase = '!r2YTbot'
+keyphrase = config['reddit']['activateCommand']
 
-topPosts = subreddit.top('day')
+topPosts = subreddit.top(config['reddit']['topFilter'])
 gildedPosts = subreddit.gilded()
 
 postIDs = []
 postTitles = []
 postComments = []
-
+postCommentsScore = []
 authorNames = []
 
 
 
 
 for submission in topPosts:
-    if submission.score>10000:
-        #print(submission.title)
+    if submission.score > config['general']['scoreFilter']:
         postIDs.append(submission.id)
 
-i=0
-
+i = 0
 for id in postIDs:
     postComments.append([])
+    postCommentsScore.append([])
     authorNames.append([])
-
-
-    #print(id)
 
     post = reddit.submission(id=id)
     print(post.title)
@@ -340,7 +303,7 @@ for id in postIDs:
     allComments = post.comments
     charCount = 0
     for comment in allComments:
-        if charCount>3000:
+        if charCount > config['reddit']['maxCharacterComment']:
             break
         #print(comment.body)
         #print(i)
@@ -352,6 +315,7 @@ for id in postIDs:
         ######################################## format the comment
 
         formattedComment = comment.body
+        score = comment.score
         try:
             authorName = comment.author.name
         except Exception as e:
@@ -360,38 +324,28 @@ for id in postIDs:
 
         ######################################## format the comment
         postComments[i].append(formattedComment)
+        postCommentsScore[i].append(score)
         authorNames[i].append(authorName)
-        #print(postComments)
 
         charCount += len(formattedComment)
 
-    i+=1
+    i += 1
 
 
-print('')
-print('')
-print('')
-print('')
-print('')
-print('')
+print('------------ Top Threads Found ------------')
 
 for i in range (0, len(postComments)):
     questionArray = postComments[i]
+    questionScoreArray = postCommentsScore[i]
     authorArray = authorNames[i]
     audioTimes = []
     audioTimes += createTitleImage(postTitles[i], str(i))
     for j in range(0, len(questionArray)):
         comment = questionArray[j]
+        score = questionScoreArray[j]
         author = authorArray[j]
         fileName = str(i) + '-' + str(j)
-        audioTimes += createImages(comment, '- u/' + author, fileName)
+        audioTimes += createImages(comment, score, author, fileName)
 
 
-    makeVid(audioTimes, 'res/images', i, postTitles[i])
-
-
-
-
-#print(type(postComments[0][0]))
-
-  #print(subreddit.submissions(id).title)
+    makeVideo(audioTimes, 'res/images', i, postTitles[i])
