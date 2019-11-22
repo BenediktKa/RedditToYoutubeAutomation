@@ -1,6 +1,8 @@
 
 import praw
 
+from datetime import datetime
+
 import unicodedata
 
 import time
@@ -127,18 +129,19 @@ def clearDirectories():
     for f in files:
         os.remove(f)
 
-def createImages (text, score, author, imagePrefix):
+def createImages(text, score, author, time, imagePrefix):
 
     audioTimes = []
 
     text = text.replace("*","")
 
     screenSize = (config['video']['width'], config['video']['height'])
-    fontSize=40
+    fontSize = 40
 
 
     font = ImageFont.truetype("Verdana.ttf", fontSize)
     authorFont = ImageFont.truetype("Verdana.ttf", int(fontSize / 1.5))
+    timeFont = ImageFont.truetype("Verdana.ttf", int(fontSize / 1.5))
     scoreFont = ImageFont.truetype("Verdana.ttf", int(fontSize / 1.5))
 
     textArray = textwrap.wrap(text, width = 3000 / fontSize)
@@ -153,9 +156,11 @@ def createImages (text, score, author, imagePrefix):
     currentLine = 0
 
     for j in range (0, numberOfFiles):
-        textOnPage=''
+        textOnPage = ''
         backgroundImage = Image.open(config['style']['commentsBackground'])
         backgroundImageDraw = ImageDraw.Draw(backgroundImage)
+
+        textWidth, textHeight = backgroundImageDraw.textsize(text, font)
 
 
         for k in range (0, int(numberOfLines)):
@@ -165,15 +170,18 @@ def createImages (text, score, author, imagePrefix):
             s = textArray[currentLine]
             textOnPage += ' '
             textOnPage += s
-            authorPos = (300, 175)
-            scorePos = (70, 490)
+            authorPos = (325, 178)
+            timePos = (700, 178)
+            scorePos = (75, 490)
 
-            textPos = (300, fontSize * 1.5 * ((currentLine % numberOfLines) + 5))
+            textPos = (275, fontSize * 1.5 * ((currentLine % numberOfLines) + 5))
             backgroundImageDraw.text(textPos, s, fill = 'white', font = font, anchor='None')
 
             backgroundImageDraw.text(authorPos, author, fill = 'white', font = authorFont, anchor = 'None')
 
-            backgroundImageDraw.text(scorePos, str(score), fill = 'white', font = scoreFont, anchor = 'None')
+            backgroundImageDraw.text(timePos, time, fill = 'white', font = authorFont, anchor = 'None')
+
+            backgroundImageDraw.text(scorePos, str(score), fill = 'white', align = 'center', font = scoreFont, anchor = 'None')
 
             currentLine += 1
 
@@ -279,6 +287,7 @@ postIDs = []
 postTitles = []
 postComments = []
 postCommentsScore = []
+postCommentsTime = []
 authorNames = []
 
 
@@ -292,6 +301,7 @@ i = 0
 for id in postIDs:
     postComments.append([])
     postCommentsScore.append([])
+    postCommentsTime.append([])
     authorNames.append([])
 
     post = reddit.submission(id=id)
@@ -303,28 +313,23 @@ for id in postIDs:
     allComments = post.comments
     charCount = 0
     for comment in allComments:
+        if comment.stickied:
+            continue
+
         if charCount > config['reddit']['maxCharacterComment']:
             break
-        #print(comment.body)
-        #print(i)
-        #.replace('\u2019', '\'').replace('\n', '\n')
-        # print (comment.body)
-        # print (type(comment.body))
-        # print('')
-
-        ######################################## format the comment
 
         formattedComment = comment.body
+        formattedDate = datetime.utcfromtimestamp(comment.created_utc).strftime('%H:%M:%S | %d.%m.%Y')
         score = comment.score
         try:
             authorName = comment.author.name
         except Exception as e:
             authorName = "<deleted>"
 
-
-        ######################################## format the comment
         postComments[i].append(formattedComment)
         postCommentsScore[i].append(score)
+        postCommentsTime[i].append(formattedDate)
         authorNames[i].append(authorName)
 
         charCount += len(formattedComment)
@@ -337,15 +342,17 @@ print('------------ Top Threads Found ------------')
 for i in range (0, len(postComments)):
     questionArray = postComments[i]
     questionScoreArray = postCommentsScore[i]
+    questionTimeArray = postCommentsTime[i]
     authorArray = authorNames[i]
     audioTimes = []
     audioTimes += createTitleImage(postTitles[i], str(i))
     for j in range(0, len(questionArray)):
         comment = questionArray[j]
         score = questionScoreArray[j]
+        time = questionTimeArray[j]
         author = authorArray[j]
         fileName = str(i) + '-' + str(j)
-        audioTimes += createImages(comment, score, author, fileName)
+        audioTimes += createImages(comment, score, author, time, fileName)
 
 
     makeVideo(audioTimes, 'res/images', i, postTitles[i])
