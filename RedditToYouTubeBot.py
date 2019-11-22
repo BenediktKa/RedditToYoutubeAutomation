@@ -3,6 +3,8 @@ import praw
 
 import unicodedata
 
+import time
+
 from PIL import Image, ImageDraw, ImageFont
 import textwrap
 
@@ -22,15 +24,18 @@ import ffmpeg
 import moviepy.editor as mp
 import glob
 
+import tts.sapi
+voice = tts.sapi.Sapi()
+voice.set_rate(2)
+voice.set_voice('Vocalizer Expressive Daniel Harpo 22kHz')
 
+print("Current Working Directory " , os.getcwd())
 
 def makeVid (audioTimes, imageDir, qNum, title):
 
     #multiplies everything by 10
     audioTimes = [x * 10 for x in audioTimes]
 
-
-    inBetweenImage = 'static.png'
     video_name = 'res/video' + str(qNum)
     fileType = '.avi'
 
@@ -63,7 +68,7 @@ def makeVid (audioTimes, imageDir, qNum, title):
     framerate = 10
     # 1 second for each photo. This means photos must be repeated based on how many seconds their audio takes.
 
-    video = cv2.VideoWriter(video_name + fileType, 0, framerate , (1270, 720))
+    video = cv2.VideoWriter(video_name + fileType, 0, framerate , (1920, 1080))
 
     # for i in range(0, len[images]):
     #     image = images[i]
@@ -102,7 +107,7 @@ def mergeAudio(videoFile, qNum, title):
 
     audioFile = AudioSegment.empty()
     for voice in voices:
-        audioFile += AudioSegment.from_mp3("res/voice/" + voice)
+        audioFile += AudioSegment.from_mp3('res/voice/' + voice)
 
     # writing mp3 files is a one liner
     audioFile.export('res/voice' + str(qNum) + '.mp3', format="mp3")
@@ -142,7 +147,7 @@ def createImages (text, author, imagePrefix):
 
     text = text.replace("*","")
 
-    screenSize=(1270, 720)
+    screenSize=(1920, 1080)
     #print(novo)
     fontSize=40
 
@@ -189,7 +194,7 @@ def createImages (text, author, imagePrefix):
 
         blank_image.save('res/images/' + imagePrefix + '-' + str(j) + ".png")
 
-        audioTimes.append(createVoice(textOnPage, 'res/voice/' + imagePrefix + '-' + str(j) + ".mp3"))
+        audioTimes.append(createVoice(textOnPage, 'res/voice/' + imagePrefix + '-' + str(j) + ".wav"))
 
     staticName = 'res/images/' + fileName + '-static.png'
 
@@ -197,7 +202,8 @@ def createImages (text, author, imagePrefix):
 
     staticName = 'res/voice/' + fileName + '-static.mp3'
     shutil.copy('res/static.mp3', staticName)
-    audioTimes.append(1.0)
+    staticAudio = MP3('res/static.mp3')
+    audioTimes.append(round(staticAudio.info.length, 1))
     return audioTimes
 
 
@@ -206,7 +212,7 @@ def createTitleImage (text, imagePrefix):
 
     audioTimes = []
 
-    screenSize=(1270, 720)
+    screenSize=(1920, 1080)
     #print(novo)
     fontSize=60
 
@@ -229,7 +235,7 @@ def createTitleImage (text, imagePrefix):
         currentLine+=1
 
     blank_image.save('res/images/' + imagePrefix + '-0-0-a' + ".png")
-    audioTimes.append(createVoice(text, 'res/voice/' + imagePrefix + '-0-0-a' + ".mp3"))
+    audioTimes.append(createVoice(text, 'res/voice/' + imagePrefix + '-0-0-a' + ".wav"))
 
     staticName = 'res/images/' + imagePrefix + '-0-0-static.png'
 
@@ -237,7 +243,8 @@ def createTitleImage (text, imagePrefix):
 
     staticName = 'res/voice/' + imagePrefix + '-0-0-static.mp3'
     shutil.copy('res/static.mp3', staticName)
-    audioTimes.append(1.0)
+    staticAudio = MP3('res/static.mp3')
+    audioTimes.append(round(staticAudio.info.length, 1))
     return audioTimes
 
 
@@ -247,21 +254,17 @@ def createVoice (text, fileName):
 
     audioTime = 0
     try:
-        tts = gTTS(lang = 'en-in', text = text)
+        voice.create_recording(fileName, text)
+        os.chdir('C:/Users/Benedikt/Downloads/RedditToYouTubeBot-master')
+        AudioSegment.from_wav(fileName).export(fileName.replace('.wav', '.mp3'), format="mp3")
 
-        tts.save(fileName)
-        audio = MP3(fileName)
-
+        audio = MP3(fileName.replace('.wav', '.mp3'))
         audioTime=audio.info.length
-        audioTime = round(audioTime,1)
+        audioTime = round(audioTime, 1)
 
 
     except Exception as e:
-        tts = gTTS(lang = 'en-in', text = 'm')
-        tts.save(fileName)
-        audio = MP3(fileName)
-        audioTime=audio.info.length
-        audioTime = round(audioTime,1)
+        print('Failed to create voice: ', e)
 
     return audioTime
 
@@ -287,11 +290,11 @@ def createVoice (text, fileName):
 # create the objects from the imported modules
 
 # reddit api login
-reddit = praw.Reddit(client_id='id, something',
-                     client_secret='secret, something',
-                     username='gullu2002',
-                     password='a password, im not telling you
-                     user_agent='r to YT by u/gullu2002')
+reddit = praw.Reddit(client_id='6YI-aV_6xoVxeA',
+                     client_secret='DRVgdE4-yrY9edp4_QK7_nmatOk',
+                     username='BlackwonderTF',
+                     password='ing39f76085612',
+                     user_agent='BlackwonderTF')
 
 
 
