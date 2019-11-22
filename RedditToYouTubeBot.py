@@ -136,13 +136,13 @@ def createImages(text, score, author, time, imagePrefix):
     text = text.replace("*","")
 
     screenSize = (config['video']['width'], config['video']['height'])
-    fontSize = 40
+    fontSize = 30
 
 
     font = ImageFont.truetype("Verdana.ttf", fontSize)
-    authorFont = ImageFont.truetype("Verdana.ttf", int(fontSize / 1.5))
-    timeFont = ImageFont.truetype("Verdana.ttf", int(fontSize / 1.5))
-    scoreFont = ImageFont.truetype("Verdana.ttf", int(fontSize / 1.5))
+    authorFont = ImageFont.truetype("Verdana.ttf", int(fontSize / 1.2))
+    timeFont = ImageFont.truetype("Verdana.ttf", int(fontSize / 1.2))
+    scoreFont = ImageFont.truetype("Verdana.ttf", int(fontSize))
 
     textArray = textwrap.wrap(text, width = 3000 / fontSize)
 
@@ -160,26 +160,23 @@ def createImages(text, score, author, time, imagePrefix):
         backgroundImage = Image.open(config['style']['commentsBackground'])
         backgroundImageDraw = ImageDraw.Draw(backgroundImage)
 
-        textWidth, textHeight = backgroundImageDraw.textsize(text, font)
-
 
         for k in range (0, int(numberOfLines)):
             if (currentLine == len(textArray)):
                 break
 
             s = textArray[currentLine]
-            textOnPage += ' '
             textOnPage += s
             authorPos = (325, 178)
             timePos = (700, 178)
-            scorePos = (75, 490)
+            scorePos = (70, 490)
 
-            textPos = (275, fontSize * 1.5 * ((currentLine % numberOfLines) + 5))
+            textPos = (275, fontSize * 1.5 * ((currentLine % numberOfLines) + 7))
             backgroundImageDraw.text(textPos, s, fill = 'white', font = font, anchor='None')
 
             backgroundImageDraw.text(authorPos, author, fill = 'white', font = authorFont, anchor = 'None')
 
-            backgroundImageDraw.text(timePos, time, fill = 'white', font = authorFont, anchor = 'None')
+            backgroundImageDraw.text(timePos, time, fill = 'white', font = timeFont, anchor = 'None')
 
             backgroundImageDraw.text(scorePos, str(score), fill = 'white', align = 'center', font = scoreFont, anchor = 'None')
 
@@ -207,25 +204,25 @@ def createTitleImage (text, imagePrefix):
 
     screenSize = (config['video']['width'], config['video']['height'])
     #print(novo)
-    fontSize=60
+    fontSize = 60
 
 
     font = ImageFont.truetype("Verdana.ttf", fontSize)
     authorFont = ImageFont.truetype("Verdana.ttf", int(fontSize/1.5))
 
 
-    textArray = textwrap.wrap(text, width=2200/fontSize)
+    textArray = textwrap.wrap(text, width = 2200 / fontSize)
 
 
 
     blank_image = Image.new('RGBA', screenSize, 'white')
     img_draw = ImageDraw.Draw(blank_image)
 
-    currentLine=0
+    currentLine = 0
     for s in textArray:
-        textPos = (20, fontSize*1.5* ( (currentLine) + 1 ))
+        textPos = (10, fontSize * 1.5 * ((currentLine) + 1))
         img_draw.text(textPos, s, fill='black', font=font, anchor='None')
-        currentLine+=1
+        currentLine += 1
 
     blank_image.save('res/images/' + imagePrefix + '-0-0-a' + ".png")
     audioTimes.append(createVoice(text, 'res/voice/' + imagePrefix + '-0-0-a' + ".wav"))
@@ -280,7 +277,7 @@ stream = subreddit.stream
 # phrase to activate the bot
 keyphrase = config['reddit']['activateCommand']
 
-topPosts = subreddit.top(config['reddit']['topFilter'])
+topPosts = subreddit.top(config['reddit']['timeFilter'])
 gildedPosts = subreddit.gilded()
 
 postIDs = []
@@ -304,12 +301,12 @@ for id in postIDs:
     postCommentsTime.append([])
     authorNames.append([])
 
-    post = reddit.submission(id=id)
-    print(post.title)
+    post = reddit.submission(id = id)
+    print('Found popular thread: ', post.title)
 
     postTitles.append(post.title)
 
-    post.comment_sort = 'top'
+    post.comment_sort = config['reddit']['filterBy']
     allComments = post.comments
     charCount = 0
     for comment in allComments:

@@ -11,9 +11,10 @@
 		"password": "ing39f76085612",
 		"userAgent": "BlackwonderTF",
 		"subreddit": "askreddit",
-		"maxCharacterComment": 3000,
+		"maxCharacterComment": 5000,
 		"activateCommand": "!r2YTbot",
-		"topFilter": "day"
+		"timeFilter": "day",
+		"filterBy": "top"
 	},
 	"youtube":
 	{
