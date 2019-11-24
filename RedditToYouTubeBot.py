@@ -1,32 +1,22 @@
-
 import praw
+from praw.models import MoreComments
 
-from datetime import datetime
-
-import unicodedata
-
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
+from PIL import Image
+from io import BytesIO
 import time
-
-import math
-
-from PIL import Image, ImageDraw, ImageFont
-import textwrap
-
-from gtts import gTTS
-
-import string
-from mutagen.mp3 import MP3
-import shutil
-
-import cv2
 import os
-
-from natsort import natsorted, ns
-
-from pydub import AudioSegment
+import soundfile as sf
 import ffmpeg
 import moviepy.editor as mp
+from natsort import natsorted, ns
+import math
+import cv2
 import glob
+
+from pydub import AudioSegment
 
 # Config
 import json
@@ -39,217 +29,69 @@ voice = tts.sapi.Sapi()
 voice.set_rate(config['voice']['speed'])
 voice.set_voice('Vocalizer Expressive Daniel Harpo 22kHz')
 
-def makeVideo(audioTimes, imageDir, qNum, title):
+def scrollToBottom():
+    SCROLL_PAUSE_TIME = 0.5
 
-    # Multiplies everything by framerate
-    audioTimes = [math.ceil(x * config['video']['framerate']) for x in audioTimes]
+    # Get scroll height
+    last_height = driver.execute_script("return document.body.scrollHeight")
 
-    video_name = 'res/video' + str(qNum)
-    fileType = '.avi'
+    while True:
+        # Scroll down to bottom
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
 
-    imagesTemp = []
-    images = []
+        # Wait to load page
+        time.sleep(SCROLL_PAUSE_TIME)
 
-    for img in os.listdir(imageDir):
-        if (img.endswith('.png')):
-            imagesTemp.append(img)
+        # Find more replies buttons
+        #try:
+        #    divs = driver.find_elements_by_xpath("//*[contains(text(), 'more replies')]")
+        #    print('Numbers of divs found:', len(divs))
 
-    # Sort images in natural order
-    imagesTemp = natsorted(imagesTemp, key = lambda y: y.lower())
+        #    for div in divs:
+        #        div.click()
+        #except:
+        #    print('No Reply more buttons')
 
-    i = 0
-    for img in imagesTemp:
-        if (img.startswith(str(qNum))):
-            images.append(img)
+        # Wait to load page
+        time.sleep(SCROLL_PAUSE_TIME)
 
-        i += 1
 
-    print(images)
-
-    frame = cv2.imread(os.path.join(imageDir, images[0]))
-    height, width, layers = frame.shape
-
-    video = cv2.VideoWriter(video_name + fileType, 0, config['video']['framerate'], (config['video']['width'], config['video']['height']))
-
-    i = 0
-    for image in images:
-        print(audioTimes[i])
-        for j in range (0, int(audioTimes[i])):
-            video.write(cv2.imread(os.path.join(imageDir, image)))
-        i += 1
-
-    cv2.destroyAllWindows()
-    video.release()
-    mergeAudio(video_name, qNum, title)
+        # Calculate new scroll height and compare with last scroll height
+        new_height = driver.execute_script("return document.body.scrollHeight")
+        if new_height == last_height:
+            break
+        last_height = new_height
 
 def truncate(n, decimals = 0):
     multiplier = 10 ** decimals
     return int(n * multiplier) / multiplier
 
-def mergeAudio(videoFile, qNum, title):
-
-    voicesDir = 'res/voice'
-    voices = [img for img in os.listdir(voicesDir) if (img.endswith('.mp3') and img.startswith(str(qNum)))]
-
-    #sort voices in natural order
-    voices = natsorted(voices, key=lambda y: y.lower())
-
-    audioFile = AudioSegment.empty()
-    i = 0
-    for voice in voices:
-        singleFile = AudioSegment.from_mp3('res/voice/' + voice)
-        audioFile += singleFile
-        i += 1
-
-    # writing mp3 files is a one liner
-    audioFile.export('res/voice' + str(qNum) + '.mp3', format='mp3')
-
-    video = mp.VideoFileClip('res/video' + str(qNum) + '.avi')
-
-    video.write_videofile('res/final/final '+ str(qNum) +'.mp4', audio='res/voice' + str(qNum) + '.mp3')
-
-    clearDirectories()
-
-    # uploadToYouTube(qNum, title)
-
-def uploadToYouTube(qNum, title):
-    fileName = 'res/final/final ' + str(qNum)
-    title = title.replace("\"", "")
-    title = title.replace("\'", "")
-    print(title)
-    cmd = "python upload_video.py --file='" + fileName + ".mp4' --title='Top Ask Reddit of Yesterday' --description='Ask Reddit: " + title + "' --keywords='meme'"
-    print(cmd)
-    os.system(cmd)
-
-def clearDirectories():
-    files = glob.glob('res/images/*')
-    for f in files:
-        os.remove(f)
-    files = glob.glob('res/voice/*')
-    for f in files:
-        os.remove(f)
-
-def createImages(text, score, author, time, imagePrefix):
-
-    audioTimes = []
-
-    text = text.replace("*","")
-
-    screenSize = (config['video']['width'], config['video']['height'])
-    fontSize = 30
-
-
-    font = ImageFont.truetype("Verdana.ttf", fontSize)
-    authorFont = ImageFont.truetype("Verdana.ttf", int(fontSize / 1.2))
-    timeFont = ImageFont.truetype("Verdana.ttf", int(fontSize / 1.2))
-    scoreFont = ImageFont.truetype("Verdana.ttf", int(fontSize))
-
-    textArray = textwrap.wrap(text, width = 3000 / fontSize)
-
-    numberOfLines = screenSize[1] / (fontSize * 1.5) - 2
-
-
-    numberOfFiles = int(len(textArray) / numberOfLines) + 1
-
-
-    j = 0
-    currentLine = 0
-
-    for j in range (0, numberOfFiles):
-        textOnPage = ''
-        backgroundImage = Image.open(config['style']['commentsBackground'])
-        backgroundImageDraw = ImageDraw.Draw(backgroundImage)
-
-
-        for k in range (0, int(numberOfLines)):
-            if (currentLine == len(textArray)):
-                break
-
-            s = textArray[currentLine]
-            textOnPage += s
-            authorPos = (325, 178)
-            timePos = (700, 178)
-            scorePos = (70, 490)
-
-            textPos = (275, fontSize * 1.5 * ((currentLine % numberOfLines) + 7))
-            backgroundImageDraw.text(textPos, s, fill = 'white', font = font, anchor='None')
-
-            backgroundImageDraw.text(authorPos, author, fill = 'white', font = authorFont, anchor = 'None')
-
-            backgroundImageDraw.text(timePos, time, fill = 'white', font = timeFont, anchor = 'None')
-
-            backgroundImageDraw.text(scorePos, str(score), fill = 'white', align = 'center', font = scoreFont, anchor = 'None')
-
-            currentLine += 1
-
-        backgroundImage.save('res/images/' + imagePrefix + '-' + str(j) + ".png")
-
-        audioTimes.append(createVoice(textOnPage, 'res/voice/' + imagePrefix + '-' + str(j) + ".wav"))
-
-    staticName = 'res/images/' + fileName + '-static.png'
-
-    shutil.copy('res/static.png', staticName)
-
-    staticName = 'res/voice/' + fileName + '-static.mp3'
-    shutil.copy('res/static.mp3', staticName)
-    staticAudio = MP3('res/static.mp3')
-    audioTimes.append(truncate(staticAudio.info.length, 1))
-    return audioTimes
-
-
-
-def createTitleImage (text, imagePrefix):
-
-    audioTimes = []
-
-    screenSize = (config['video']['width'], config['video']['height'])
-    #print(novo)
-    fontSize = 60
-
-
-    font = ImageFont.truetype("Verdana.ttf", fontSize)
-    authorFont = ImageFont.truetype("Verdana.ttf", int(fontSize/1.5))
-
-
-    textArray = textwrap.wrap(text, width = 2200 / fontSize)
-
-
-
-    blank_image = Image.new('RGBA', screenSize, 'white')
-    img_draw = ImageDraw.Draw(blank_image)
-
-    currentLine = 0
-    for s in textArray:
-        textPos = (10, fontSize * 1.5 * ((currentLine) + 1))
-        img_draw.text(textPos, s, fill='black', font=font, anchor='None')
-        currentLine += 1
-
-    blank_image.save('res/images/' + imagePrefix + '-0-0-a' + ".png")
-    audioTimes.append(createVoice(text, 'res/voice/' + imagePrefix + '-0-0-a' + ".wav"))
-
-    staticName = 'res/images/' + imagePrefix + '-0-0-static.png'
-
-    shutil.copy('res/static.png', staticName)
-
-    staticName = 'res/voice/' + imagePrefix + '-0-0-static.mp3'
-    shutil.copy('res/static.mp3', staticName)
-    staticAudio = MP3('res/static.mp3')
-    audioTimes.append(truncate(staticAudio.info.length, 1))
-    return audioTimes
-
-
-
-
-def createVoice (text, fileName):
+def createVoice(text, fileName):
 
     audioTime = 0
     try:
         voice.create_recording(fileName, text)
         os.chdir(config['general']['workingDir'])
-        AudioSegment.from_wav(fileName).export(fileName.replace('.wav', '.mp3'), format="mp3")
 
-        audio = MP3(fileName.replace('.wav', '.mp3'))
-        audioTime = truncate(audio.info.length, 1)
+        sound = sf.SoundFile(fileName)
+        audioTime = len(sound) / sound.samplerate
+
+        fillerTime = 1 - (audioTime - int(audioTime))
+
+
+        emptyFiller = AudioSegment.silent(duration = math.ceil(fillerTime * 1000))
+        unfilledSound = AudioSegment.from_wav(fileName)
+
+        finalSound = unfilledSound + emptyFiller
+
+        finalSound.export(fileName, format = 'wav')
+
+        sound = sf.SoundFile(fileName)
+        audioTime = truncate(len(sound) / sound.samplerate, 1)
+        print('Final Audio Time', audioTime)
+
+
+
 
 
     except Exception as e:
@@ -257,12 +99,100 @@ def createVoice (text, fileName):
 
     return audioTime
 
+def formatImages(imageDir):
+    images = []
 
-# ------------ Main Code ------------
+    for image in os.listdir(imageDir):
+        if (image.endswith('.png')):
+            images.append(image)
+
+    for image in os.listdir(imageDir):
+        foregroundImage = Image.open(os.path.join(imageDir, image), 'r')
+        foregroundWidth, foregroundHeight = foregroundImage.size
+        backgroundImage = Image.open(config['style']['commentsBackground'])
+        backgroundWidth, backgroundHeight = backgroundImage.size
+        offset = ((backgroundWidth - foregroundWidth) // 2, (backgroundHeight - foregroundHeight) // 2)
+        backgroundImage.paste(foregroundImage, offset)
+        backgroundImage.save('images/a' + image)
+
+    for image in images:
+        os.remove(os.path.join(imageDir, image))
 
 
+def makeVideo(audioTimes, imageDir, videoNumber):
 
-# create the objects from the imported modules
+    # Multiplies everything by framerate
+    audioTimes = [x * config['video']['framerate'] for x in audioTimes]
+
+    videoName = 'video' + str(videoNumber)
+    fileType = '.avi'
+
+    images = []
+
+    for img in os.listdir(imageDir):
+        if (img.endswith('.png')):
+            images.append(img)
+
+    # Sort images in natural order
+    images = natsorted(images, key = lambda y: y.lower())
+
+    print('Images to make video from:', images)
+    video = cv2.VideoWriter(videoName + fileType, 0, config['video']['framerate'], (config['video']['width'], config['video']['height']))
+
+    i = 0
+    for image in images:
+        print('Processing Image', i)
+        print('Frames to write:', audioTimes[i])
+
+        frame = cv2.imread(os.path.join(imageDir, images[i]))
+
+        for j in range (0, int(audioTimes[i])):
+            video.write(frame)
+
+        i += 1
+
+    cv2.destroyAllWindows()
+    video.release()
+    mergeAudio(videoName, videoNumber)
+
+def truncate(n, decimals = 0):
+    multiplier = 10 ** decimals
+    return int(n * multiplier) / multiplier
+
+def mergeAudio(videoFile, videoNumber):
+
+    voicesDir = 'voices'
+    voices = [img for img in os.listdir(voicesDir) if (img.endswith('.wav'))]
+
+    # Sort voices in natural order
+    voices = natsorted(voices, key=lambda y: y.lower())
+
+    audioFile = AudioSegment.empty()
+    i = 0
+    for voice in voices:
+        singleFile = AudioSegment.from_wav('voices/' + voice)
+        audioFile += singleFile
+        i += 1
+
+    # Writing mp3 files is a one liner
+    audioFile.export('voices' + str(videoNumber) + '.mp3', format = 'mp3')
+
+    video = mp.VideoFileClip('video' + str(videoNumber) + '.avi')
+
+    video.write_videofile('final '+ str(videoNumber) +'.mp4', audio = 'voices' + str(videoNumber) + '.mp3')
+
+    clearDirectories()
+
+def clearDirectories():
+    files = glob.glob('images/*')
+    for file in files:
+        os.remove(file)
+    files = glob.glob('voices/*')
+    for file in files:
+        os.remove(file)
+
+clearDirectories()
+
 
 # Reddit Login
 reddit = praw.Reddit(client_id = config['reddit']['clientID'],
@@ -281,75 +211,111 @@ topPosts = subreddit.top(config['reddit']['timeFilter'])
 gildedPosts = subreddit.gilded()
 
 postIDs = []
-postTitles = []
-postComments = []
-postCommentsScore = []
-postCommentsTime = []
-authorNames = []
 
-
-
+profile = webdriver.FirefoxProfile()
+profile.set_preference('permissions.default.desktop-notification', 1)
+driver = webdriver.Firefox(executable_path = "geckodriver.exe", firefox_profile = profile)
 
 for submission in topPosts:
+    if submission.over_18:
+        continue;
     if submission.score > config['general']['scoreFilter']:
         postIDs.append(submission.id)
 
 i = 0
 for id in postIDs:
-    postComments.append([])
-    postCommentsScore.append([])
-    postCommentsTime.append([])
-    authorNames.append([])
 
+    audioTimes = []
+
+    #id = 'e07nci'
     post = reddit.submission(id = id)
-    print('Found popular thread: ', post.title)
+    #post.comments.replace_more(limit = 2000)
+    print('Found popular thread:', post.title)
+    print('URL:', post.url)
 
-    postTitles.append(post.title)
+    confirmation = input('Do you want to make a video out of this thread? (Y/N)')
 
+    if confirmation.lower() == 'n':
+        continue
+
+    driver.get(post.url + '?sort=' + config['reddit']['filterBy'])
+
+    try:
+        driver.find_element_by_xpath("//button[contains(text(),'I Agree')]").click()
+        driver.find_element_by_xpath("//button[contains(text(),'View entire discussion')]").click()
+    except:
+        print('Already accepted cookies')
+
+    scrollToBottom()
+
+    time.sleep(1)
+    print('Taking Screenshots')
+    post.comments.replace_more(limit = 0)
     post.comment_sort = config['reddit']['filterBy']
-    allComments = post.comments
     charCount = 0
-    for comment in allComments:
+
+    j = 0
+    element = driver.find_element_by_id('t3_' + id)
+    screenshot = element.screenshot_as_png
+    image = Image.open(BytesIO(screenshot))
+    image.save('images/' + str(j) + '.png')
+    audioTimes.append(createVoice(post.title, 'voices/' + str(j) + '.wav'))
+    j += 1
+
+    audioTimeTotal = 0
+
+    for comment in post.comments:
+        if isinstance(comment, MoreComments):
+            break
+
         if comment.stickied:
             continue
 
-        if charCount > config['reddit']['maxCharacterComment']:
+        if config['reddit']['maxCharacterComment'] < len(comment.body):
+            continue
+        if config['reddit']['minCommentScore'] > comment.score:
+            continue
+        if comment.banned_by is not None:
+            continue
+        if comment.author == None:
+            continue
+
+        print('Comment found with score of:', comment.score)
+
+        try:
+            element = driver.find_element_by_id('t1_' + comment.id)
+        except:
+            print('Cannot find element')
+            continue
+
+        if element.size['height'] > config['video']['height']:
+            continue
+
+        screenshot = element.screenshot_as_png
+        image = Image.open(BytesIO(screenshot))
+        image.save('images/' + str(j) + '.png')
+        audioTime = createVoice(comment.body, 'voices/' + str(j) + '.wav')
+        audioTimes.append(audioTime)
+        audioTimeTotal += audioTime
+        time.sleep(1)
+        j += 1
+
+        if audioTimeTotal > config['reddit']['maxVideoMinutes'] * 60:
+            print('Max minutes reached')
             break
 
-        formattedComment = comment.body
-        formattedDate = datetime.utcfromtimestamp(comment.created_utc).strftime('%H:%M:%S | %d.%m.%Y')
-        score = comment.score
-        try:
-            authorName = comment.author.name
-        except Exception as e:
-            authorName = "<deleted>"
+        if config['reddit']['minCommentLimit'] <= j:
+            print('Comment limit reached')
+            break
 
-        postComments[i].append(formattedComment)
-        postCommentsScore[i].append(score)
-        postCommentsTime[i].append(formattedDate)
-        authorNames[i].append(authorName)
+    # Format Images
+    print('Formatting Images')
+    formatImages('images')
 
-        charCount += len(formattedComment)
-
+    # Make the video
+    print('Creating Video')
+    makeVideo(audioTimes, 'images', i)
     i += 1
 
 
-print('------------ Top Threads Found ------------')
-
-for i in range (0, len(postComments)):
-    questionArray = postComments[i]
-    questionScoreArray = postCommentsScore[i]
-    questionTimeArray = postCommentsTime[i]
-    authorArray = authorNames[i]
-    audioTimes = []
-    audioTimes += createTitleImage(postTitles[i], str(i))
-    for j in range(0, len(questionArray)):
-        comment = questionArray[j]
-        score = questionScoreArray[j]
-        time = questionTimeArray[j]
-        author = authorArray[j]
-        fileName = str(i) + '-' + str(j)
-        audioTimes += createImages(comment, score, author, time, fileName)
-
-
-    makeVideo(audioTimes, 'res/images', i, postTitles[i])
+print('------------ Finalized Video Creation ------------')
