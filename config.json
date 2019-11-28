@@ -11,12 +11,12 @@
 		"password": "ing39f76085612",
 		"userAgent": "BlackwonderTF",
 		"subreddit": "askreddit",
-		"maxCharacterComment": 3000,
-		"minCommentScore": 200,
+		"maxCharacterComment": 2500,
+		"minCommentScore": 5000,
 		"minCommentLimit": 50,
 		"maxVideoMinutes": 15,
 		"activateCommand": "!r2YTbot",
-		"timeFilter": "week",
+		"timeFilter": "day",
 		"filterBy": "top"
 	},
 	"youtube":
@@ -28,7 +28,7 @@
 	},
 	"general":
 	{
-		"workingDir": "F:/YoutubeAutomation/RedditToYoutubeAutomation",
+		"workingDir": "C:/Users/Benedikt/Documents/GitHub/RedditToYoutubeAutomation",
 		"scoreFilter": 10000
 	},
 	"video":

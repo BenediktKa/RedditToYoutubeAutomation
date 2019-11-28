@@ -6,3 +6,5 @@
 *.wav
 *.mp3
 *.ttf
+*.psd
+geckodriver.log

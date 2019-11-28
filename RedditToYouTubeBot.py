@@ -165,7 +165,7 @@ def mergeAudio(videoFile, videoNumber):
     voices = [img for img in os.listdir(voicesDir) if (img.endswith('.wav'))]
 
     # Sort voices in natural order
-    voices = natsorted(voices, key=lambda y: y.lower())
+    voices = natsorted(voices, key = lambda y: y.lower())
 
     audioFile = AudioSegment.empty()
     i = 0
@@ -175,11 +175,11 @@ def mergeAudio(videoFile, videoNumber):
         i += 1
 
     # Writing mp3 files is a one liner
-    audioFile.export('voices' + str(videoNumber) + '.mp3', format = 'mp3')
+    audioFile.export('voices' + str(videoNumber) + '.mp3', format = 'mp3', bitrate='352k')
 
     video = mp.VideoFileClip('video' + str(videoNumber) + '.avi')
 
-    video.write_videofile('final '+ str(videoNumber) +'.mp4', audio = 'voices' + str(videoNumber) + '.mp3')
+    video.write_videofile('final/final '+ str(videoNumber) +'.mp4', audio = 'voices' + str(videoNumber) + '.mp3')
 
     clearDirectories()
 
